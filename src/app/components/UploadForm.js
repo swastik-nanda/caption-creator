@@ -2,29 +2,53 @@
 import axios from 'axios';
 import UploadIcon from './UploadIcon';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function UploadForm() {
   const [isUploading, setIsUploading] = useState(false);
+  const router = useRouter();
+
   async function upload(event) {
     event.preventDefault();
 
     const files = event.target.files;
     if (files.length > 0) {
+      const file = files[0];
+
+      // Validate file type and size
+      if (!['video/mp4', 'video/mov'].includes(file.type)) {
+        alert('Only MP4 or MOV files are allowed');
+        return;
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        alert('File size should be less than 50MB');
+        return;
+      }
+
       const formData = new FormData();
-      setIsUploading((t) => true);
-      formData.append('file', files[0]);
+      setIsUploading(true);
+      formData.append('file', file);
 
       try {
-        // Send the file to the server to be uploaded
         const res = await axios.post('/api/upload', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
-        setIsUploading((t) => false);
-        console.log('Response:', res.data); // Log the response from the server
+        setIsUploading(false);
+
+        if (res.status === 200) {
+          const newName = res.data.newName;
+          router.push('/' + newName);
+        } else {
+          console.error('Unexpected response:', res);
+        }
       } catch (error) {
-        console.error('Error uploading file:', error);
+        setIsUploading(false);
+        console.error(
+          'Error uploading file:',
+          error.response || error.message
+        );
       }
     }
   }
