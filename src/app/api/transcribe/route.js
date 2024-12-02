@@ -1,3 +1,4 @@
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
   GetTranscriptionJobCommand,
   StartTranscriptionJobCommand,
@@ -50,6 +51,33 @@ async function getJob(fileName) {
   return jobStatusResult;
 }
 
+async function getTranscriptionFile(fileName) {
+  const transcriptionFile = `${fileName}.transcription`;
+  const s3client = new S3Client({
+    region: 'eu-north-1',
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+  });
+
+  const getObjectCommand = new GetObjectCommand({
+    Bucket: process.env.BUCKET_NAME,
+    Key: transcriptionFile,
+  });
+
+  let transcriptionFileResponse = null;
+  try {
+    transcriptionFileResponse = await s3client.send(getObjectCommand);
+  } catch (e) {
+    console.log(e);
+  }
+
+  if (transcriptionFileResponse) {
+    console.log(transcriptionFileResponse);
+  }
+}
+
 export async function GET(req) {
   const url = new URL(req.url); // Parse the URL to extract query parameters
   const fileName = url.searchParams.get('filename'); // Get the filename parameter
@@ -64,6 +92,8 @@ export async function GET(req) {
     );
   }
 
+  // Find ready Transcription
+  await getTranscriptionFile(fileName);
   // Check if the transcription job exists first
   const existingJobFound = await getJob(fileName);
 
