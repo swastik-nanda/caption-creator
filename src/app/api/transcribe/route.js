@@ -51,6 +51,17 @@ async function getJob(fileName) {
   return jobStatusResult;
 }
 
+async function streamToString(stream) {
+  const chunks = [];
+  return new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    stream.on('end', () =>
+      resolve(Buffer.concat(chunks).toString('utf-8'))
+    );
+    stream.on('error', reject);
+  });
+}
+
 async function getTranscriptionFile(fileName) {
   const transcriptionFile = `${fileName}.transcription`;
   const s3client = new S3Client({
@@ -74,8 +85,11 @@ async function getTranscriptionFile(fileName) {
   }
 
   if (transcriptionFileResponse) {
-    console.log(transcriptionFileResponse);
+    return JSON.parse(
+      await streamToString(transcriptionFileResponse.Body)
+    );
   }
+  return null;
 }
 
 export async function GET(req) {
@@ -93,7 +107,13 @@ export async function GET(req) {
   }
 
   // Find ready Transcription
-  await getTranscriptionFile(fileName);
+  const transcription = await getTranscriptionFile(fileName);
+  if (transcription) {
+    return Response.json({
+      status: 'COMPLETED',
+      transcription: transcription,
+    });
+  }
   // Check if the transcription job exists first
   const existingJobFound = await getJob(fileName);
 
